@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  proxy:
+    build: .
+    container_name: opencode-proxy
+    ports:
+      - "6446:6446"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./api-keys.json:/app/api-keys.json
+    restart: unless-stopped
+    network_mode: host
