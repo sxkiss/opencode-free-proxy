@@ -10,6 +10,7 @@ const WORKER_PORT_START = BASE_PORT + 100;
 
 const workers = [];
 let nextWorker = 0;
+const skipUntil = {}; // workerId -> timestamp until which to skip
 
 function startWorker(id) {
   const workerPort = WORKER_PORT_START + id;
@@ -18,12 +19,15 @@ function startWorker(id) {
     stdio: "inherit",
   });
 
-  workers[id] = { process: worker, port: workerPort, healthy: false };
+  workers[id] = { id, process: worker, port: workerPort, healthy: false };
 
   worker.on("message", (msg) => {
     if (msg.type === "ready") {
       console.log(`[BALANCER] Worker ${id} ready on port ${workerPort}`);
       workers[id].healthy = true;
+    } else if (msg.type === "rate_limited") {
+      console.log(`[BALANCER] Worker ${id} rate limited, skipping for 5s`);
+      skipUntil[id] = Date.now() + 5000;
     }
   });
 
@@ -41,7 +45,8 @@ for (let i = 0; i < WORKERS; i++) {
 }
 
 const server = http.createServer((req, res) => {
-  const healthyWorkers = workers.filter((w) => w.healthy);
+  const now = Date.now();
+  const healthyWorkers = workers.filter((w) => w.healthy && (!skipUntil[w.id] || skipUntil[w.id] <= now));
   if (healthyWorkers.length === 0) {
     res.writeHead(503, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: { message: "No healthy workers", type: "service_unavailable" } }));

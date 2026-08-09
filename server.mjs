@@ -64,6 +64,8 @@ const MODELS = [
   "nemotron-3-ultra-free",
   "north-mini-code-free",
   "laguna-s-2.1-free",
+  "test-model-1",
+  "test-model-2",
 ];
 
 // Session pool for rotating sessions (more quota)
@@ -92,6 +94,23 @@ function getSession(user) {
   }
   
   return session.id;
+}
+
+// Notify balancer about rate limit and refresh current session
+function notifyRateLimit(sessionId) {
+  // Find and refresh the rate-limited session
+  for (const session of sessionPool) {
+    if (session.id === sessionId) {
+      session.id = ocId("ses");
+      session.ts = Date.now();
+      console.log(`[SESSION Worker ${WORKER_ID}] Refreshed rate-limited session`);
+      break;
+    }
+  }
+  // Notify balancer to skip this worker temporarily
+  if (process.send) {
+    process.send({ type: "rate_limited", workerId: WORKER_ID });
+  }
 }
 
 initSessionPool();
@@ -128,7 +147,7 @@ function zenRequest(model, messages, stream, tools, tool_choice, sessionId) {
 }
 
 // Pipe Zen response to client (OpenAI format passthrough)
-function pipeZenResponse(zenOpts, body, stream, res) {
+function pipeZenResponse(zenOpts, body, stream, res, sessionId) {
   const req = https.request(zenOpts, (zenRes) => {
     let firstChunk = null;
     let headersSent = false;
@@ -144,6 +163,7 @@ function pipeZenResponse(zenOpts, body, stream, res) {
             if (parsed.error || parsed.type === "error") {
               const errMsg = parsed.error?.message || parsed.message || "Rate limit exceeded";
               console.log("[ZEN RATE LIMITED]", errMsg);
+              notifyRateLimit(sessionId);
               if (!res.headersSent) {
                 res.status(429).json({
                   error: { message: errMsg + " (free model rate limit)", type: "rate_limit_error", code: "rate_limit_exceeded" }
@@ -338,7 +358,7 @@ function openAIToAnthropic(oaiResp, model, inputTokens) {
 }
 
 // Stream OpenAI SSE → Anthropic SSE
-function pipeZenAsAnthropic(zenOpts, body, model, res, inputTokens) {
+function pipeZenAsAnthropic(zenOpts, body, model, res, inputTokens, sessionId) {
   const msgId = ocId("msg");
 
   const req = https.request(zenOpts, (zenRes) => {
@@ -387,6 +407,7 @@ function pipeZenAsAnthropic(zenOpts, body, model, res, inputTokens) {
             const parsed = JSON.parse(trimmed);
             if (parsed.error || parsed.type === "error") {
               const errMsg = parsed.error?.message || parsed.message || "Rate limit";
+              notifyRateLimit(sessionId);
               if (!res.headersSent) {
                 res.writeHead(429, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({
@@ -533,7 +554,7 @@ app.post("/v1/chat/completions", (req, res) => {
   console.log("[OAI]", new Date().toISOString(), user, model, stream ? "stream" : "sync", "msgs:", JSON.stringify(msgSummary));
 
   const { body, options } = zenRequest(model, messages, stream, tools, tool_choice, sessionId);
-  pipeZenResponse(options, body, stream, res);
+  pipeZenResponse(options, body, stream, res, sessionId);
 });
 
 // ── Routes: Anthropic Messages format ──────────────────────────────
@@ -560,12 +581,13 @@ app.post("/v1/messages", async (req, res) => {
   const { body, options } = zenRequest(model, messages, stream, tools, undefined, sessionId);
 
   if (stream) {
-    pipeZenAsAnthropic(options, body, model, res, inputTokens);
+    pipeZenAsAnthropic(options, body, model, res, inputTokens, sessionId);
   } else {
     try {
       const zenResp = await zenRequestFull(options, body);
       if (zenResp.status === 429 || zenResp.data?.error) {
         const errMsg = zenResp.data?.error?.message || "Rate limit exceeded";
+        notifyRateLimit(sessionId);
         return res.status(429).json({
           type: "error", error: { type: "rate_limit_error", message: errMsg + " (free model rate limit)" },
         });
