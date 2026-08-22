@@ -10,7 +10,7 @@ app.use(express.json({ limit: "10mb" }));
 
 const PORT = process.env.PROXY_PORT || 6446;
 const OC_VERSION = "1.15.0";
-const PROXY_VERSION = "9";
+const PROXY_VERSION = "10";
 const HTTP_PROXY = process.env.HTTP_PROXY || "";
 
 // Proxy agent for upstream requests
@@ -57,15 +57,13 @@ function ocId(prefix) {
 }
 
 const MODELS = [
-  "deepseek-v4-flash-free",
+  "x-preview-f-free",
   "big-pickle",
   "mimo-v2.5-free",
-  "ling-3.0-flash-free",
+  "hy3-free",
   "nemotron-3-ultra-free",
-  "north-mini-code-free",
+  "nemotron-3.5-lightning-free",
   "laguna-s-2.1-free",
-  "test-model-1",
-  "test-model-2",
 ];
 
 // Session pool for rotating sessions (more quota)

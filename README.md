@@ -21,12 +21,12 @@ Done. Server is at `http://localhost:6446`. API keys are in `api-keys.json` (aut
 
 | Model | What it is | Reliability |
 |-------|-----------|-------------|
-| `deepseek-v4-flash-free` | DeepSeek V4 Flash | Solid |
-| `big-pickle` | DeepSeek V4 Flash (alias) | Solid |
+| `x-preview-f-free` | X Preview F | Solid |
+| `big-pickle` | Big Pickle (reasoning) | Solid |
 | `mimo-v2.5-free` | MiMo V2.5 | Hit or miss |
-| `ling-3.0-flash-free` | Ling 3.0 Flash | Solid |
+| `hy3-free` | Hunyuan 3 | Solid |
 | `nemotron-3-ultra-free` | NVIDIA Nemotron 3 Ultra | Solid |
-| `north-mini-code-free` | North Mini Code | Solid |
+| `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning | Solid |
 | `laguna-s-2.1-free` | Laguna S 2.1 | Hit or miss |
 
 All models support streaming, tool calls, and system messages.
@@ -40,7 +40,7 @@ curl http://localhost:6446/v1/chat/completions \
   -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash-free",
+    "model": "x-preview-f-free",
     "messages": [{"role": "user", "content": "Hello"}],
     "stream": true
   }'
@@ -53,7 +53,7 @@ curl http://localhost:6446/v1/messages \
   -H "x-api-key: YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash-free",
+    "model": "x-preview-f-free",
     "system": "You are helpful.",
     "messages": [{"role": "user", "content": "Hello"}],
     "max_tokens": 1024,
@@ -89,9 +89,9 @@ Add to `~/.config/opencode/opencode.json`:
       "apiKey": "YOUR_KEY",
       "baseURL": "http://localhost:6446/v1",
       "models": {
-        "free/deepseek-v4-flash-free": {
-          "id": "deepseek-v4-flash-free",
-          "name": "free/deepseek-v4-flash-free",
+        "free/x-preview-f-free": {
+          "id": "x-preview-f-free",
+          "name": "free/x-preview-f-free",
           "attachment": true,
           "reasoning": true
         }
@@ -105,7 +105,7 @@ Add to `~/.config/opencode/opencode.json`:
 
 - Base URL: `http://YOUR_HOST:6446/v1`
 - API Key: your key from `api-keys.json`
-- Model: `deepseek-v4-flash-free`
+- Model: `x-preview-f-free`
 
 ### Claude Code (Anthropic format)
 
@@ -196,7 +196,7 @@ docker run -d --name opencode-proxy --network host \
 curl http://localhost:6446/v1/chat/completions \
   -H "Authorization: Bearer any-key-you-want" \
   -H "Content-Type: application/json" \
-  -d '{"model": "deepseek-v4-flash-free", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "x-preview-f-free", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ### 常用命令
