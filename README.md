@@ -21,13 +21,15 @@ Done. Server is at `http://localhost:6446`. API keys are in `api-keys.json` (aut
 
 | Model | What it is | Reliability |
 |-------|-----------|-------------|
-| `x-preview-f-free` | X Preview F | Solid |
 | `big-pickle` | Big Pickle (reasoning) | Solid |
 | `mimo-v2.5-free` | MiMo V2.5 | Hit or miss |
 | `hy3-free` | Hunyuan 3 | Solid |
 | `nemotron-3-ultra-free` | NVIDIA Nemotron 3 Ultra | Solid |
 | `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning | Solid |
 | `laguna-s-2.1-free` | Laguna S 2.1 | Hit or miss |
+| `ling-3.0-flash-fin-free` | Ling 3.0 Flash (Finance) | New / 已验证可用 |
+| `deepseek-v4-flash-free` | DeepSeek V4 Flash | New / 上游暂不可用 |
+| `muse-spark-1.2-contributor-free` | Muse Spark 1.2 Contributor | New / 上游暂不可用 |
 
 All models support streaming, tool calls, and system messages.
 
@@ -40,7 +42,7 @@ curl http://localhost:6446/v1/chat/completions \
   -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "x-preview-f-free",
+    "model": "hy3-free",
     "messages": [{"role": "user", "content": "Hello"}],
     "stream": true
   }'
@@ -53,7 +55,7 @@ curl http://localhost:6446/v1/messages \
   -H "x-api-key: YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "x-preview-f-free",
+    "model": "hy3-free",
     "system": "You are helpful.",
     "messages": [{"role": "user", "content": "Hello"}],
     "max_tokens": 1024,
@@ -89,9 +91,9 @@ Add to `~/.config/opencode/opencode.json`:
       "apiKey": "YOUR_KEY",
       "baseURL": "http://localhost:6446/v1",
       "models": {
-        "free/x-preview-f-free": {
-          "id": "x-preview-f-free",
-          "name": "free/x-preview-f-free",
+        "free/hy3-free": {
+          "id": "hy3-free",
+          "name": "free/hy3-free",
           "attachment": true,
           "reasoning": true
         }
@@ -105,7 +107,7 @@ Add to `~/.config/opencode/opencode.json`:
 
 - Base URL: `http://YOUR_HOST:6446/v1`
 - API Key: your key from `api-keys.json`
-- Model: `x-preview-f-free`
+- Model: `hy3-free`
 
 ### Claude Code (Anthropic format)
 
@@ -196,7 +198,7 @@ docker run -d --name opencode-proxy --network host \
 curl http://localhost:6446/v1/chat/completions \
   -H "Authorization: Bearer any-key-you-want" \
   -H "Content-Type: application/json" \
-  -d '{"model": "x-preview-f-free", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "hy3-free", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ### 常用命令
