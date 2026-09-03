@@ -59,13 +59,9 @@ function ocId(prefix) {
 const MODELS = [
   "big-pickle",
   "mimo-v2.5-free",
-  "hy3-free",
   "nemotron-3-ultra-free",
   "nemotron-3.5-lightning-free",
   "laguna-s-2.1-free",
-  "ling-3.0-flash-fin-free",
-  "deepseek-v4-flash-free",
-  "muse-spark-1.2-contributor-free",
 ];
 
 // Session pool for rotating sessions (more quota)

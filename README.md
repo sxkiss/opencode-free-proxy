@@ -22,14 +22,13 @@ Done. Server is at `http://localhost:6446`. API keys are in `api-keys.json` (aut
 | Model | What it is | Reliability |
 |-------|-----------|-------------|
 | `big-pickle` | Big Pickle (reasoning) | Solid |
-| `mimo-v2.5-free` | MiMo V2.5 | Hit or miss |
-| `hy3-free` | Hunyuan 3 | Solid |
+| `mimo-v2.5-free` | MiMo V2.5 | Solid |
 | `nemotron-3-ultra-free` | NVIDIA Nemotron 3 Ultra | Solid |
 | `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning | Solid |
-| `laguna-s-2.1-free` | Laguna S 2.1 | Hit or miss |
-| `ling-3.0-flash-fin-free` | Ling 3.0 Flash (Finance) | New / 已验证可用 |
-| `deepseek-v4-flash-free` | DeepSeek V4 Flash | New / 上游暂不可用 |
-| `muse-spark-1.2-contributor-free` | Muse Spark 1.2 Contributor | New / 上游暂不可用 |
+| `laguna-s-2.1-free` | Laguna S 2.1 | Hit or miss (上时503) |
+
+> 所有模型通过上游 Zen 免费层匿名访问（`Bearer public`），上游共有 29 个 free 模型，
+> 但大部分需要 Zen 登录态，本 proxy 仅收录经验证可匿名使用的模型。
 
 All models support streaming, tool calls, and system messages.
 
@@ -42,7 +41,7 @@ curl http://localhost:6446/v1/chat/completions \
   -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "hy3-free",
+    "model": "big-pickle",
     "messages": [{"role": "user", "content": "Hello"}],
     "stream": true
   }'
@@ -55,7 +54,7 @@ curl http://localhost:6446/v1/messages \
   -H "x-api-key: YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "hy3-free",
+    "model": "big-pickle",
     "system": "You are helpful.",
     "messages": [{"role": "user", "content": "Hello"}],
     "max_tokens": 1024,
@@ -91,9 +90,9 @@ Add to `~/.config/opencode/opencode.json`:
       "apiKey": "YOUR_KEY",
       "baseURL": "http://localhost:6446/v1",
       "models": {
-        "free/hy3-free": {
-          "id": "hy3-free",
-          "name": "free/hy3-free",
+        "free/big-pickle": {
+          "id": "big-pickle",
+          "name": "free/big-pickle",
           "attachment": true,
           "reasoning": true
         }
@@ -107,7 +106,7 @@ Add to `~/.config/opencode/opencode.json`:
 
 - Base URL: `http://YOUR_HOST:6446/v1`
 - API Key: your key from `api-keys.json`
-- Model: `hy3-free`
+- Model: `big-pickle`
 
 ### Claude Code (Anthropic format)
 
@@ -198,7 +197,7 @@ docker run -d --name opencode-proxy --network host \
 curl http://localhost:6446/v1/chat/completions \
   -H "Authorization: Bearer any-key-you-want" \
   -H "Content-Type: application/json" \
-  -d '{"model": "hy3-free", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "big-pickle", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ### 常用命令
