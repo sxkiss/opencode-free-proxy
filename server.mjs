@@ -56,34 +56,14 @@ function ocId(prefix) {
   return `${prefix}_${ts}${rnd}`;
 }
 
-// 上游边缘IP备选列表（用于DNS故障时降级）
-const UPSTREAM_IPS = ["172.65.90.20","172.65.90.21","172.65.90.22","172.65.90.23"];
-let upstreamIpIndex = 0;
-// 选择上游边缘IP（轮询，DNS故障时降级使用）
+// ── 上游边缘IP池（自动扫描/延迟优选/定时更新） ───────────────
+import { initPool, nextIp } from "./ip_pool.js";
+initPool().catch(e => console.log("[IPPOOL] 初始化失败:", e.message));
+// 选择上游IP：优先低延迟池，无池时回退域名
 function pickUpstreamIp() {
-  return UPSTREAM_IPS[upstreamIpIndex++ % UPSTREAM_IPS.length];
+  const ip = nextIp();
+  return ip || "opencode.ai";
 }
-// 探测并更新可用边缘IP（无人值守，每30分钟执行一次）
-async function probeAndRefreshIps() {
-  const results = await Promise.all(UPSTREAM_IPS.map(ip => new Promise(resolve => {
-    const req = https.request({ hostname: ip, port: 443, path: "/zen/v1/models", method: "GET",
-      headers: { "Host": "opencode.ai", "Authorization": "Bearer public", "x-opencode-client": "cli", "x-opencode-project": "global", "User-Agent": "opencode/1.15.0" },
-      servername: "opencode.ai", timeout: 5000 }, res => {
-        let d = ""; res.on("data", c => d += c); res.on("end", () => resolve({ ip, ok: res.statusCode === 200 }));
-      });
-    req.on("error", e => resolve({ ip, ok: false }));
-    req.setTimeout(6000, () => { req.destroy(); resolve({ ip, ok: false }); });
-    req.end();
-  })));
-  const available = results.filter(r => r.ok).map(r => r.ip);
-  if (available.length > 0 && JSON.stringify(available) !== JSON.stringify(UPSTREAM_IPS)) {
-    console.log(`[UPSTREAM] 可用边缘IP更新: ${available.join(", ")}`);
-  }
-  return available;
-}
-// 启动时探测一次，之后每30分钟探测
-probeAndRefreshIps().catch(e => console.log("[UPSTREAM] 初始探测失败:", e.message));
-setInterval(() => { probeAndRefreshIps().catch(e => console.log("[UPSTREAM] 定时探测失败:", e.message)); }, 30 * 60 * 1000);
 // 探测并更新可用边缘 IP（无人值守）
 
 const MODELS = [
@@ -146,13 +126,12 @@ function zenRequest(model, messages, stream, tools, tool_choice, sessionId) {
   const body = JSON.stringify(reqBody);
   const requestId = ocId("msg");
 
-  // 优先使用域名（自动DNS解析+正确SNI），DNS故障时降级到IP直连
-  const useIpFallback = false; // 暂时固定用域名，IP备用
-  const hostname = useIpFallback ? pickUpstreamIp() : "opencode.ai";
+  // 实际请求始终走域名+代理（Cloudflare对IP直连POST会403拦截）
+  // IP池(ip_pool.js)仅用于选优/探活/边缘IP监控
   return {
     body,
     options: {
-      hostname: hostname,
+      hostname: "opencode.ai",
       host: "opencode.ai",
       port: 443,
       path: "/zen/v1/chat/completions",
