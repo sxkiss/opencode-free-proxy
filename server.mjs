@@ -68,7 +68,8 @@ function pickUpstreamIp() {
 
 const MODELS = [
   "big-pickle",
-  "nemotron-3.5-lightning-free",
+  "mimo-v2.5-free",
+  "nemotron-3-ultra-free",
 ];
 
 // Session pool for rotating sessions (more quota)
