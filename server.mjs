@@ -57,7 +57,7 @@ function ocId(prefix) {
 }
 
 // ── 上游边缘IP池（自动扫描/延迟优选/定时更新） ───────────────
-import { initPool, nextIp } from "./ip_pool.js";
+import { initPool, nextIp, healthCheck, refreshPool, getPool } from "./ip_pool.js";
 initPool().catch(e => console.log("[IPPOOL] 初始化失败:", e.message));
 // 选择上游IP：优先低延迟池，无池时回退域名
 function pickUpstreamIp() {
@@ -126,17 +126,19 @@ function zenRequest(model, messages, stream, tools, tool_choice, sessionId) {
   const body = JSON.stringify(reqBody);
   const requestId = ocId("msg");
 
-  // 实际请求始终走域名+代理（Cloudflare对IP直连POST会403拦截）
-  // IP池(ip_pool.js)仅用于选优/探活/边缘IP监控
+  // 域名套IP：hostname 用池子优选的最低延迟边缘IP直连，
+  // 但 SNI(servername) 和 Host 报头都伪装成 opencode.ai ——
+  // CF 据此正常处理POST（等价于域名访问），同时走了延迟最优的IP。
+  const upstreamIp = pickUpstreamIp();
   return {
     body,
     options: {
-      hostname: "opencode.ai",
-      host: "opencode.ai",
+      hostname: upstreamIp,            // 直连优选IP（低延迟）
       port: 443,
       path: "/zen/v1/chat/completions",
       method: "POST",
       headers: {
+        "Host": "opencode.ai",         // Host报头伪装成域名（唯一Host来源，避免Node用IP覆盖）
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(body),
         "Authorization": "Bearer public",
@@ -146,9 +148,9 @@ function zenRequest(model, messages, stream, tools, tool_choice, sessionId) {
         "x-opencode-request": requestId,
         "x-opencode-session": sessionId,
       },
-      servername: "opencode.ai",
+      servername: "opencode.ai",       // SNI伪装成域名
       timeout: 120000,
-      agent: proxyAgent,
+      // 注意：不挂 proxyAgent，纯裸直连池子优选IP（边缘IP轮换，不走代理）
     },
   };
 }
@@ -617,6 +619,28 @@ app.get("/health", (_req, res) => res.json({
   status: "ok", version: `v${PROXY_VERSION}`, models: MODELS.length,
   endpoints: ["/v1/chat/completions", "/v1/messages", "/v1/models"],
 }));
+
+// ── Admin: 上游IP池状态（admin key 鉴权） ────────────────────
+app.get("/admin/pool", (req, res) => {
+  if (req.query.key !== apiKeys.admin) {
+    return res.status(403).json({ error: "Invalid admin key" });
+  }
+  const pool = getPool();
+  res.json({
+    domain: process.env.UPSTREAM_DOMAIN || "opencode.ai",
+    pool_size: pool.length,
+    pool: pool.map(p => ({ ip: p.ip, ms: p.ms, status: p.status, last_check: new Date(p.ts).toISOString() })),
+    note: "IP池仅用于边缘健康监控/延迟地图。实际出流走域名(opencode.ai)，由Cloudflare Anycast路由到最近节点。",
+  });
+});
+// 手动触发全量重扫
+app.post("/admin/pool/refresh", (req, res) => {
+  if (req.query.key !== apiKeys.admin) {
+    return res.status(403).json({ error: "Invalid admin key" });
+  }
+  refreshPool().then(p => res.json({ ok: true, pool_size: p.length }))
+    .catch(e => res.status(500).json({ ok: false, error: e.message }));
+});
 
 // ── Start ──────────────────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
