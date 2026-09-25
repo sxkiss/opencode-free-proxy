@@ -67,6 +67,7 @@ function pickUpstreamIp() {
 // 探测并更新可用边缘 IP（无人值守）
 
 const MODELS = [
+  "space-bunny-free",
   "big-pickle",
   "mimo-v2.5-free",
   "nemotron-3-ultra-free",
