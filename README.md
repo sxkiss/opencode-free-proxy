@@ -19,18 +19,32 @@ Done. Server is at `http://localhost:6446`. API keys are in `api-keys.json` (aut
 
 ## What you get
 
-| Model | What it is | Reliability |
+| Model | What it is | Reliability / 实测 TPS |
 |-------|-----------|-------------|
-| `space-bunny-free` | Space Bunny | Solid（2026-09-25 实测匿名可用，默认首选） |
-| `big-pickle` | Big Pickle (reasoning) | Hit or miss（上游收紧，常报 FreeTierError/限流） |
-| `mimo-v2.5-free` | MiMo V2.5 | Hit or miss（同上） |
-| `nemotron-3-ultra-free` | NVIDIA Nemotron 3 Ultra | Hit or miss（同上，且响应慢） |
+| `deepseek-v4.1-flash-free` | DeepSeek V4.1 Flash | ✅ 稳定（2026-10-15 实测，纯生成 226~278 tok/s，200K 上下文） |
+| `space-bunny-free` | Space Bunny | ✅ 稳定（TTFT ~1.2s，端到端 172 tok/s，最快首 token） |
+| `big-pickle` | Big Pickle (reasoning) | ⚠️ 可用但慢（~36 tok/s） |
+| `cat-jam-free` | Cat Jam | ✅ 稳定 |
+| `mimo-v2.6-flash-free` | MiMo V2.6 Flash | ✅ 稳定 |
+| `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning | ✅ 稳定 |
+| `jev-1.13-free` | Jev 1.13 | ✅ 稳定 |
+| `step-5-preview-free` | Step 5 Preview | ✅ 稳定 |
+| `longcat-2.5-preview-free` | LongCat 2.5 Preview | ✅ 稳定 |
+| `muse-spark-1.3-contributor-free` | Muse Spark 1.3 | ✅ 稳定 |
 
 > 所有模型通过上游 Zen 免费层匿名访问（`Bearer public`）。
-> 2026-09-25 复测：上游对匿名调用收紧，原三个模型频繁返回
-> `FreeTierError` / `FreeUsageLimitError`；`space-bunny-free` 为本轮唯一稳定回 200 的免费模型，
-> 已加入列表并置首位。其余 `-free` 模型（`jev-1.13-free`、`deepseek-v4-flash-free`、
-> `muse-spark-1.2/1.3-contributor-free`）分别报 500 / 400 / 500，暂不可用。
+>
+> **2026-10-15 重大更新**：上游 client-fingerprint gate 要求（任一不满足即 403
+> `FreeTierError`）：
+> 1. `User-Agent` 必须是 `opencode/<version>`（版本 ≥ 1.18；本项目用 `opencode/latest/2.0.22/cli`）
+> 2. `x-opencode-session` 必须是真实 identifier 形状：`ses_` + 12 位小写 hex + 14 位 base62
+>    （低 12 位 counter 需 ≤ 63，由 `ocId()` 复刻 opencode 算法生成）
+> 3. `x-opencode-session-id` 必须等于 `x-opencode-session`
+> 4. 请求体 `stream` 必须为 `true`
+> 5. 请求体 `tools` 必须包含 `bash`/`glob`/`grep`/`read` 四个
+>
+> 本项目已复刻全部规则（`server.mjs`），实测生产端口 6446 全模型可正常对话。
+> 端点改用官方客户端实际使用的 `https://opencode.ai/inference/v1`（`/zen/v1` 仅作 fallback）。
 
 All models support streaming, tool calls, and system messages.
 

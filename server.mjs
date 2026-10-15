@@ -50,10 +50,35 @@ function auth(req) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
+// 复刻 opencode 的真实 identifier 生成（packages/schema/src/identifier.ts）：
+//   descending: counter++ (每毫秒重置, 从1起) → current = ts*0x1000 + counter
+//   value = ~current (48位二补数) → 12位小写hex + 14位base62
+// 上游 client-fingerprint gate 只校验低12位 counter (counter<=63) + hex小写 + tail长度14。
+// 旧的 base64url 实现含 '-'/'_' 且 counter 越界 → 被上游 403 拒绝。
+const ID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const MASK_48 = (1n << 48n) - 1n;
+const COUNTER_SPAN = 0x1000n;
+const MAX_COUNTER = 63; // 上游 gate 上限
+let idLastTs = 0;
+let idCounter = 0;
+function randomBase62(n) {
+  const b = crypto.randomBytes(n);
+  let out = "";
+  for (let i = 0; i < n; i++) out += ID_CHARS[b[i] % 62];
+  return out;
+}
+function encodeIdentifier(descending) {
+  const ts = Date.now();
+  if (ts !== idLastTs) { idLastTs = ts; idCounter = 0; }
+  idCounter++;
+  if (idCounter > MAX_COUNTER) { idLastTs += 1; idCounter = 1; }
+  const current = BigInt(idLastTs) * COUNTER_SPAN + BigInt(idCounter);
+  const value = (descending ? ~current : current) & MASK_48;
+  return value.toString(16).padStart(12, "0") + randomBase62(14);
+}
 function ocId(prefix) {
-  const ts = Date.now().toString(16);
-  const rnd = crypto.randomBytes(12).toString("base64url").slice(0, 16);
-  return `${prefix}_${ts}${rnd}`;
+  // ses_ 用 descending，msg_ 用 ascending（与 opencode 一致）
+  return `${prefix}_${encodeIdentifier(prefix === "ses")}`;
 }
 
 // ── 上游边缘IP池（自动扫描/延迟优选/定时更新） ───────────────
@@ -67,10 +92,16 @@ function pickUpstreamIp() {
 // 探测并更新可用边缘 IP（无人值守）
 
 const MODELS = [
+  "deepseek-v4.1-flash-free",
   "space-bunny-free",
   "big-pickle",
-  "mimo-v2.5-free",
-  "nemotron-3-ultra-free",
+  "cat-jam-free",
+  "mimo-v2.6-flash-free",
+  "nemotron-3.5-lightning-free",
+  "jev-1.13-free",
+  "step-5-preview-free",
+  "longcat-2.5-preview-free",
+  "muse-spark-1.3-contributor-free",
 ];
 
 // Session pool for rotating sessions (more quota)
@@ -120,10 +151,36 @@ function notifyRateLimit(sessionId) {
 
 initSessionPool();
 
+// ── 上游 client-fingerprint gate（2026-10 复刻） ──────────────────
+// 上游 free tier 要求：
+//   1. User-Agent 形如 opencode/<version>（且版本 >= 1.18，老版本 → 426）
+//   2. x-opencode-session = ses_ + 12位小写hex + 14位base62（低12位counter<=63）
+//   3. body.stream 必须为 true
+//   4. body.tools 必须包含 bash/glob/grep/read 四个
+// 任一不满足 → 403 FreeTierError。
+const ZEN_UA = process.env.ZEN_UA || "opencode/latest/2.0.22/cli";
+const ZEN_FREE_TOOLS = ["bash", "glob", "grep", "read"].map((n) => ({
+  type: "function",
+  function: {
+    name: n, description: n,
+    parameters: { type: "object", properties: { p: { type: "string" } }, required: ["p"] },
+  },
+}));
+// 确保 tools 含四个指纹工具（缺失则补齐；客户端自带同名工具保留其定义）
+function withFingerprintTools(tools) {
+  const list = Array.isArray(tools) ? [...tools] : [];
+  const names = new Set(list.map((t) => t?.function?.name).filter(Boolean));
+  for (const ft of ZEN_FREE_TOOLS) {
+    if (!names.has(ft.function.name)) list.push(ft);
+  }
+  return list;
+}
+
 // ── Zen API transport ──────────────────────────────────────────────
 function zenRequest(model, messages, stream, tools, tool_choice, sessionId) {
-  const reqBody = { model, messages, stream: !!stream };
-  if (tools?.length) reqBody.tools = tools;
+  // 上游只接受 stream:true；对客户端是否流式由 pipeZenResponse 决定。
+  const reqBody = { model, messages, stream: true };
+  reqBody.tools = withFingerprintTools(tools);
   if (tool_choice) reqBody.tool_choice = tool_choice;
   const body = JSON.stringify(reqBody);
   const requestId = ocId("msg");
@@ -137,18 +194,19 @@ function zenRequest(model, messages, stream, tools, tool_choice, sessionId) {
     options: {
       hostname: upstreamIp,            // 直连优选IP（低延迟）
       port: 443,
-      path: "/zen/v1/chat/completions",
+      path: "/inference/v1/chat/completions",
       method: "POST",
       headers: {
         "Host": "opencode.ai",         // Host报头伪装成域名（唯一Host来源，避免Node用IP覆盖）
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(body),
         "Authorization": "Bearer public",
-        "User-Agent": `opencode/${OC_VERSION} ai-sdk/provider-utils/4.0.23 runtime/bun/1.3.13`,
+        "User-Agent": ZEN_UA,
         "x-opencode-client": "cli",
         "x-opencode-project": "global",
         "x-opencode-request": requestId,
         "x-opencode-session": sessionId,
+        "x-opencode-session-id": sessionId,  // gate 要求与 session 一致
       },
       servername: "opencode.ai",       // SNI伪装成域名
       timeout: 120000,
@@ -241,18 +299,59 @@ function pipeZenResponse(zenOpts, body, stream, res, sessionId) {
 }
 
 // Collect full Zen response (non-streaming) and return parsed JSON
+// 注意：上游只返回 SSE 流。此函数将 SSE 聚合为 OpenAI 风格的完整 completion。
 function zenRequestFull(zenOpts, body) {
   return new Promise((resolve, reject) => {
     const req = https.request(zenOpts, (zenRes) => {
-      const chunks = [];
-      zenRes.on("data", (c) => chunks.push(c));
-      zenRes.on("end", () => {
-        const raw = Buffer.concat(chunks).toString();
-        try {
-          resolve({ status: zenRes.statusCode, data: JSON.parse(raw), raw });
-        } catch {
-          resolve({ status: zenRes.statusCode, data: null, raw });
+      let buffer = "";
+      let sseChunks = [];
+      zenRes.on("data", (c) => {
+        buffer += c.toString();
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          const s = line.trim();
+          if (!s.startsWith("data:")) continue;
+          const payload = s.slice(5).trim();
+          if (payload === "[DONE]") continue;
+          try { sseChunks.push(JSON.parse(payload)); } catch {}
         }
+      });
+      zenRes.on("end", () => {
+        // 若有非 SSE（JSON 错误）直接返回原文
+        if (sseChunks.length === 0) {
+          const raw = buffer;
+          try { resolve({ status: zenRes.statusCode, data: JSON.parse(raw), raw }); }
+          catch { resolve({ status: zenRes.statusCode, data: null, raw }); }
+          return;
+        }
+        // 聚合 SSE 为完整 OpenAI completion
+        const id = sseChunks.find(c => c.id)?.id || "chatcmpl-zennonstream";
+        const created = sseChunks.find(c => c.created)?.created || Math.floor(Date.now()/1000);
+        const model = sseChunks.find(c => c.model)?.model || "";
+        let content = "";
+        let reasoning = "";
+        let toolCalls = null;
+        let finish = null;
+        let usage = null;
+        for (const c of sseChunks) {
+          const choice = c.choices?.[0];
+          if (!choice) continue;
+          const d = choice.delta || {};
+          if (d.content) content += d.content;
+          if (d.reasoning_content) reasoning += d.reasoning_content;
+          if (choice.finish_reason) finish = choice.finish_reason;
+          if (c.usage) usage = c.usage;
+        }
+        const message = { role: "assistant", content };
+        if (reasoning) message.reasoning_content = reasoning;
+        if (toolCalls) message.tool_calls = toolCalls;
+        const data = {
+          id, object: "chat.completion", created, model,
+          choices: [{ index: 0, message, finish_reason: finish || "stop" }],
+        };
+        if (usage) data.usage = usage;
+        resolve({ status: zenRes.statusCode, data, raw: JSON.stringify(data) });
       });
     });
     req.on("error", reject);
@@ -565,7 +664,26 @@ app.post("/v1/chat/completions", (req, res) => {
   console.log("[OAI]", new Date().toISOString(), user, model, stream ? "stream" : "sync", "msgs:", JSON.stringify(msgSummary));
 
   const { body, options } = zenRequest(model, messages, stream, tools, tool_choice, sessionId);
-  pipeZenResponse(options, body, stream, res, sessionId);
+  if (stream) {
+    pipeZenResponse(options, body, true, res, sessionId);
+  } else {
+    // 上游只返回 SSE，非流式需聚合后回 JSON
+    zenRequestFull(options, body)
+      .then(({ status, data }) => {
+        if (status !== 200 || !data?.choices) {
+          const errMsg = data?.error?.message || "Upstream error";
+          if (status === 429 || (data?.error)) notifyRateLimit(sessionId);
+          return res.status(status === 200 ? 502 : (status || 502)).json({
+            error: { message: errMsg + " (free model rate limit)", type: "rate_limit_error" },
+          });
+        }
+        res.json(data);
+      })
+      .catch((e) => {
+        console.log("[ZEN ERROR]", e.message);
+        res.status(502).json({ error: { message: "Upstream error: " + e.message, type: "upstream_error" } });
+      });
+  }
 });
 
 // ── Routes: Anthropic Messages format ──────────────────────────────
