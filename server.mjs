@@ -92,6 +92,7 @@ function pickUpstreamIp() {
 // 探测并更新可用边缘 IP（无人值守）
 
 const MODELS = [
+  "glm-5.3-flash-free",
   "deepseek-v4.1-flash-free",
   "space-bunny-free",
   "big-pickle",

@@ -21,6 +21,7 @@ Done. Server is at `http://localhost:6446`. API keys are in `api-keys.json` (aut
 
 | Model | What it is | Reliability / 实测 TPS |
 |-------|-----------|-------------|
+| `glm-5.3-flash-free` | GLM 5.3 Flash | ✅ 已加入（2026-10-16 上游上线；新模型发布期常限流，稍后恢复） |
 | `deepseek-v4.1-flash-free` | DeepSeek V4.1 Flash | ✅ 稳定（2026-10-15 实测，纯生成 226~278 tok/s，200K 上下文） |
 | `space-bunny-free` | Space Bunny | ✅ 稳定（TTFT ~1.2s，端到端 172 tok/s，最快首 token） |
 | `big-pickle` | Big Pickle (reasoning) | ⚠️ 可用但慢（~36 tok/s） |
