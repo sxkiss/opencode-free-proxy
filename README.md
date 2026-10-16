@@ -19,19 +19,23 @@ Done. Server is at `http://localhost:6446`. API keys are in `api-keys.json` (aut
 
 ## What you get
 
-| Model | What it is | Reliability / 实测 TPS |
-|-------|-----------|-------------|
-| `glm-5.3-flash-free` | GLM 5.3 Flash | ✅ 已加入（2026-10-16 上游上线；新模型发布期常限流，稍后恢复） |
-| `deepseek-v4.1-flash-free` | DeepSeek V4.1 Flash | ✅ 稳定（2026-10-15 实测，纯生成 226~278 tok/s，200K 上下文） |
-| `space-bunny-free` | Space Bunny | ✅ 稳定（TTFT ~1.2s，端到端 172 tok/s，最快首 token） |
-| `big-pickle` | Big Pickle (reasoning) | ⚠️ 可用但慢（~36 tok/s） |
-| `cat-jam-free` | Cat Jam | ✅ 稳定 |
-| `mimo-v2.6-flash-free` | MiMo V2.6 Flash | ✅ 稳定 |
-| `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning | ✅ 稳定 |
-| `jev-1.13-free` | Jev 1.13 | ✅ 稳定 |
-| `step-5-preview-free` | Step 5 Preview | ✅ 稳定 |
-| `longcat-2.5-preview-free` | LongCat 2.5 Preview | ✅ 稳定 |
-| `muse-spark-1.3-contributor-free` | Muse Spark 1.3 | ✅ 稳定 |
+> 以下为 **2026-10-16 与上游 `opencode.ai/zen/v1/models` 全量对齐**的免费模型清单（12 个 `-free` + `big-pickle`）。
+
+| Model | What it is |
+|-------|-----------|
+| `glm-5.3-flash-free` | GLM 5.3 Flash（最新） |
+| `deepseek-v4.1-flash-free` | DeepSeek V4.1 Flash（纯生成 226~278 tok/s，200K 上下文） |
+| `space-bunny-free` | Space Bunny（TTFT ~1.2s，最快首 token） |
+| `big-pickle` | Big Pickle (reasoning) |
+| `cat-jam-free` | Cat Jam |
+| `ll-alpha-free` | LL Alpha |
+| `mimo-v2.6-flash-free` | MiMo V2.6 Flash |
+| `nemotron-3.5-lightning-free` | NVIDIA Nemotron 3.5 Lightning |
+| `nemotron-3.5-super-vl-free` | NVIDIA Nemotron 3.5 Super VL |
+| `jev-1.13-free` | Jev 1.13 |
+| `longcat-2.5-preview-free` | LongCat 2.5 Preview |
+| `muse-spark-1.2-contributor-free` | Muse Spark 1.2 |
+| `muse-spark-1.3-contributor-free` | Muse Spark 1.3 |
 
 > 所有模型通过上游 Zen 免费层匿名访问（`Bearer public`）。
 >

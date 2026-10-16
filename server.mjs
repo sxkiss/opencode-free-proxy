@@ -91,17 +91,20 @@ function pickUpstreamIp() {
 }
 // 探测并更新可用边缘 IP（无人值守）
 
+// 与上游 opencode.ai/zen/v1/models 的 free 清单对齐（2026-10-16 全量同步）
 const MODELS = [
   "glm-5.3-flash-free",
   "deepseek-v4.1-flash-free",
   "space-bunny-free",
   "big-pickle",
   "cat-jam-free",
+  "ll-alpha-free",
   "mimo-v2.6-flash-free",
   "nemotron-3.5-lightning-free",
+  "nemotron-3.5-super-vl-free",
   "jev-1.13-free",
-  "step-5-preview-free",
   "longcat-2.5-preview-free",
+  "muse-spark-1.2-contributor-free",
   "muse-spark-1.3-contributor-free",
 ];
 
